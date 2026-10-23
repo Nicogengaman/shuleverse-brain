@@ -39,6 +39,30 @@ export default {
           const res = await fetch(SUPA_URL + '/rest/v1/' + body.table + '?' + body.idField + '=eq.' + body.id, { method: 'PATCH', headers: h, body: JSON.stringify({ status: 'RETIRED' }) });
           r = await res.json();
         }
+        else if (p === 'ai') {
+          const body = await request.json();
+          const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
+          let lastError = 'Capacity exhausted';
+          
+          for (const model of MODELS) {
+            try {
+              const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${env.GEMINI_API_KEY}`, { 
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: body.p }] }], systemInstruction: body.s ? { parts: [{ text: body.s }] } : undefined }),
+                signal: AbortSignal.timeout(20000)
+              });
+              if (res.ok) {
+                const j = await res.json();
+                const txt = j.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (txt) { r = { ok: true, text: txt }; break; }
+              } else if (res.status !== 429 && res.status < 500) {
+                const err = await res.json();
+                throw new Error(err.error?.message || `API Error ${res.status}`);
+              }
+            } catch (e) { lastError = e.message; }
+          }
+          if (!r.ok) throw new Error(lastError);
+        }
         
         return new Response(JSON.stringify(r), { headers: { 'Content-Type': 'application/json' } });
       } catch (e) {
@@ -93,6 +117,14 @@ export default {
           .fg label { display: block; font-size: 12px; color: var(--mt); margin-bottom: 6px; text-transform: uppercase; font-weight: 600; }
           .fg input, .fg select, .fg textarea { width: 100%; padding: 12px; background: var(--bg); border: 1px solid var(--br); border-radius: 8px; color: var(--tx); font-size: 14px; }
           .btn { width: 100%; padding: 14px; border-radius: 8px; border: none; font-weight: bold; font-size: 15px; cursor: pointer; background: var(--bl); color: #fff; margin-top: 10px; }
+          
+          .ai-c { background: var(--cd); border: 1px solid var(--br); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+          .ai-t { color: var(--gd); font-weight: bold; margin-bottom: 8px; font-size: 16px; }
+          .ai-r { background: var(--bg); border: 1px solid var(--br); padding: 12px; border-radius: 8px; margin-top: 12px; white-space: pre-wrap; font-size: 13px; line-height: 1.5; max-height: 250px; overflow-y: auto; display: none; }
+          
+          .scene-box { background: var(--cd); border-left: 3px solid var(--gd); padding: 12px; margin-bottom: 12px; border-radius: 0 8px 8px 0; }
+          .ai-btn-row { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+          .ai-btn { flex: 1; padding: 6px; background: var(--bg); color: white; border: 1px solid var(--br); border-radius: 6px; font-size: 11px; cursor: pointer; }
         </style>
       </head>
       <body>
@@ -124,10 +156,29 @@ export default {
             <h3 style="margin-bottom: 16px;">Episodes</h3>
             <div id="list-episodes">Loading...</div>
           </div>
+
+          <div id="content-episode-detail" class="content">
+            <button class="btn" style="width:auto; padding:8px 16px; margin-bottom:16px; background:var(--cd); color:var(--tx); border:1px solid var(--br);" onclick="go('stories')">← Back</button>
+            <h2 id="ep-title" style="margin-bottom:8px;"></h2>
+            <p id="ep-syn" style="color:var(--mt); font-size:13px; margin-bottom:16px;"></p>
+            <h3 style="margin-bottom:12px; color:var(--gd);">Scenes</h3>
+            <div id="scene-list"></div>
+          </div>
           
           <div id="content-ai" class="content">
-            <h3 style="margin-bottom: 16px;">AI Studio</h3>
-            <p style="color:var(--mt)">AI will be added in Batch 4.</p>
+            <h3 style="margin-bottom: 16px; color: var(--gd);">AI Studio</h3>
+            <div class="ai-c">
+              <div class="ai-t">💡 Generate Episode Idea</div>
+              <textarea id="ai-prompt" style="width:100%;height:70px;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br)"></textarea>
+              <button class="btn" onclick="genCtxIdea()">Generate</button>
+              <div id="ai-res" class="ai-r"></div>
+            </div>
+            <div class="ai-c">
+              <div class="ai-t">🎬 Auto-Scenes Generator</div>
+              <select id="ai-ep-select" style="width:100%;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br);margin-bottom:10px;"></select>
+              <button class="btn" onclick="genAutoScenes()">Generate 4 Scenes</button>
+              <div id="ai-scene-res" class="ai-r"></div>
+            </div>
           </div>
         </main>
 
@@ -165,13 +216,20 @@ export default {
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.getElementById('tab-' + page).classList.add('active');
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-            document.getElementById('content-' + page).classList.add('active');
+            
+            // Handle "episode-detail" special case for tab highlighting
+            if (page === 'episode-detail') {
+              document.getElementById('tab-stories').classList.add('active');
+            } else {
+              document.getElementById('content-' + page).classList.add('active');
+            }
             
             document.getElementById('add-btn').style.display = (page === 'universe' || page === 'stories') ? 'flex' : 'none';
 
             if (page === 'home') loadDashboard();
             if (page === 'universe') loadEntityList(currentEntity);
             if (page === 'stories') loadEpisodes();
+            if (page === 'ai') populateAiDropdowns();
           }
 
           async function loadDashboard() {
@@ -225,6 +283,11 @@ export default {
               document.getElementById('m-form').innerHTML = form;
               document.getElementById('m-save').innerText = 'Create';
               document.getElementById('modal').style.display = 'flex';
+            } else if (currentTab === 'stories') {
+               document.getElementById('m-title').innerText = 'Add New Episode';
+               document.getElementById('m-form').innerHTML = '<div class="fg"><label>Title</label><input id="f-title"></div><div class="fg"><label>Logline</label><input id="f-logline"></div><div class="fg"><label>Synopsis</label><textarea id="f-synopsis"></textarea></div>';
+               document.getElementById('m-save').innerText = 'Create';
+               document.getElementById('modal').style.display = 'flex';
             }
           }
 
@@ -259,23 +322,33 @@ export default {
 
           async function saveEntity() {
             const btn = document.getElementById('m-save'); btn.innerText = 'Saving...'; btn.disabled = true;
-            const cfg = entityConfig[currentEntity];
-            const payload = {
-              name: document.getElementById('f-name').value,
-              [cfg.typeField]: document.getElementById('f-type').value,
-              canon_status: 'PENDING_REVIEW',
-              status: 'ACTIVE'
-            };
+            
+            if (currentTab === 'universe') {
+              const cfg = entityConfig[currentEntity];
+              const payload = {
+                name: document.getElementById('f-name').value,
+                [cfg.typeField]: document.getElementById('f-type').value,
+                canon_status: 'PENDING_REVIEW',
+                status: 'ACTIVE'
+              };
 
-            try {
-              if (editingId) {
-                await fetch('/api/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentEntity, idField: cfg.id, id: editingId, data: payload }) });
-              } else {
-                await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentEntity, data: payload }) });
-              }
-              document.getElementById('modal').style.display = 'none';
-              loadEntityList(currentEntity);
-            } catch(e) { alert('Error: ' + e.message); } finally { btn.innerText = 'Save'; btn.disabled = false; }
+              try {
+                if (editingId) {
+                  await fetch('/api/update', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentEntity, idField: cfg.id, id: editingId, data: payload }) });
+                } else {
+                  await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: currentEntity, data: payload }) });
+                }
+                document.getElementById('modal').style.display = 'none';
+                loadEntityList(currentEntity);
+              } catch(e) { alert('Error: ' + e.message); } finally { btn.innerText = 'Save'; btn.disabled = false; }
+            } else {
+              const p = { title: document.getElementById('f-title').value, logline: document.getElementById('f-logline').value, synopsis: document.getElementById('f-synopsis').value, canon_status: 'PENDING_REVIEW', lifecycle_status: 'PLANNED', episode_code: 'SV-E' + Date.now().toString().slice(-3) };
+              try {
+                await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'episodes', data: p }) });
+                document.getElementById('modal').style.display = 'none';
+                loadEpisodes();
+              } catch(e) { alert('Error: ' + e.message); } finally { btn.innerText = 'Save'; btn.disabled = false; }
+            }
           }
 
           async function loadEpisodes() {
@@ -286,11 +359,105 @@ export default {
                 if (d.length === 0) return l.innerHTML = 'No episodes found.';
                 let html = '';
                 d.forEach(e => {
-                  html += '<div class="item"><div class="title">' + (e.title || 'Untitled') + '</div><div class="sub">' + (e.episode_code || '') + '</div></div>';
+                  const safeTitle = (e.title||'Untitled').replace(/'/g, "\\\\'");
+                  const safeSyn = (e.synopsis||'').replace(/'/g, "\\\\'").replace(/\n/g, " ");
+                  html += '<div class="item" onclick="openEpisode(\\''+e.episode_id+'\\', \\''+safeTitle+'\\', \\''+safeSyn+'\\')"><div class="title">' + safeTitle + '</div><div class="sub">' + (e.episode_code || '') + '</div></div>';
                 });
                 l.innerHTML = html;
               }
             } catch (e) { l.innerHTML = 'Error loading data'; }
+          }
+
+          async function openEpisode(id, title, synopsis) {
+            go('episode-detail');
+            document.getElementById('content-episode-detail').classList.add('active');
+            document.getElementById('ep-title').innerText = title;
+            document.getElementById('ep-syn').innerText = synopsis;
+            const l = document.getElementById('scene-list'); l.innerHTML = 'Loading scenes...';
+            
+            try {
+              const r = await fetch('/api/entities?table=scenes&filter=episode_id=eq.' + id + '&order=scene_number.asc');
+              const d = await r.json();
+              if (Array.isArray(d)) {
+                if (d.length === 0) return l.innerHTML = '<p style="color:var(--mt)">No scenes yet. Use the AI tab to generate some!</p>';
+                let html = '';
+                d.forEach(s => {
+                  const sumStr = (s.summary || '').replace(/'/g, "\\\\\\\\'"); // heavily escaped for onclick
+                  html += '<div class="scene-box">';
+                  html += '<div class="title">Scene ' + s.scene_number + ': ' + (s.title||'') + '</div>';
+                  html += '<div style="font-size:13px; color:var(--mt); margin-top:4px;">' + (s.summary||'') + '</div>';
+                  html += '<div class="ai-btn-row">';
+                  html += '<button class="ai-btn" onclick="sceneAi(\\'Expand\\', \\'' + sumStr + '\\')">🪄 Expand</button>';
+                  html += '<button class="ai-btn" onclick="sceneAi(\\'Concept\\', \\'' + sumStr + '\\')">📸 Art</button>';
+                  html += '<button class="ai-btn" onclick="sceneAi(\\'Mood\\', \\'' + sumStr + '\\')">🎥 Mood</button>';
+                  html += '</div></div>';
+                });
+                l.innerHTML = html;
+              }
+            } catch (e) { l.innerHTML = 'Error loading scenes.'; }
+          }
+
+          async function getContext() {
+            const c = await (await fetch('/api/entities?table=characters')).json();
+            const l = await (await fetch('/api/entities?table=locations')).json();
+            let ctx = "UNIVERSE CONTEXT:\\n";
+            if (Array.isArray(c)) ctx += "CHARACTERS:\\n" + c.map(x=>'- '+x.name+' ('+x.character_type+'): '+x.role).join('\\n');
+            if (Array.isArray(l)) ctx += "\\nLOCATIONS:\\n" + l.map(x=>'- '+x.name).join('\\n');
+            return ctx;
+          }
+
+          async function populateAiDropdowns() {
+            try {
+              const ep = await (await fetch('/api/entities?table=episodes')).json();
+              if (Array.isArray(ep)) {
+                document.getElementById('ai-ep-select').innerHTML = ep.map(e=>'<option value="'+e.episode_id+'">'+e.title+'</option>').join('');
+              }
+            } catch(e) {}
+          }
+
+          async function genCtxIdea() {
+            const p = document.getElementById('ai-prompt').value; if (!p) return;
+            const b = document.getElementById('ai-res'); b.style.display = 'block'; b.innerText = 'Reading context...';
+            const ctx = await getContext();
+            const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p: 'Idea: ' + p, s: 'You are the AI for a Kenyan school drama. Here is canon:\\n' + ctx + '\\n\\nReturn ONLY a valid JSON object with keys: title, logline, synopsis. No markdown.' }) });
+            const d = await r.json();
+            if (d.ok) {
+              const bt = String.fromCharCode(96); const reg = new RegExp(bt+bt+bt+'json|'+bt+bt+bt, 'gi'); let txt = d.text.replace(reg, '').trim();
+              try { const j = JSON.parse(txt); const nl = String.fromCharCode(10); b.innerText = 'TITLE: '+j.title+nl+nl+'LOGLINE: '+j.logline+nl+nl+'SYNOPSIS: '+j.synopsis; } catch(e) { b.innerText = txt; }
+            } else b.innerText = 'Error: ' + d.error;
+          }
+
+          async function genAutoScenes() {
+            const id = document.getElementById('ai-ep-select').value; if (!id) return;
+            const b = document.getElementById('ai-scene-res'); b.style.display = 'block'; b.innerText = 'Reading context...';
+            const ctx = await getContext();
+            const ep = await (await fetch('/api/entities?table=episodes&filter=episode_id=eq.'+id)).json();
+            if (!ep || ep.length === 0) return;
+            const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p: 'Synopsis: ' + ep[0].synopsis, s: 'You are an architect. Here is canon:\\n' + ctx + '\\n\\nReturn ONLY a valid JSON array of 4 objects with keys: title, summary, sequence_label (OPENING, ESCALATION, ENCOUNTER, CONFRONTATION, CLIFFHANGER). No markdown.' }) });
+            const d = await r.json();
+            if (d.ok) {
+              const bt = String.fromCharCode(96); const reg = new RegExp(bt+bt+bt+'json|'+bt+bt+bt, 'gi'); let txt = d.text.replace(reg, '').trim();
+              try {
+                const scenes = JSON.parse(txt); let succ = 0;
+                for (let i = 0; i < scenes.length; i++) {
+                  await fetch('/api/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ table: 'scenes', data: { episode_id: id, scene_number: i+1, title: scenes[i].title, summary: scenes[i].summary, sequence_label: scenes[i].sequence_label, lifecycle_status: 'PLANNED', canon_status: 'PENDING_REVIEW' } }) });
+                  succ++;
+                }
+                b.innerText = 'Success! Saved ' + succ + ' scenes.';
+              } catch(e) { b.innerText = 'Error: ' + txt; }
+            } else b.innerText = 'Error: ' + d.error;
+          }
+
+          async function sceneAi(type, summary) {
+            const m = document.createElement('div'); m.className = 'mdl'; m.style.display = 'flex';
+            m.innerHTML = '<div class="mdl-c"><div class="mdl-h"><h3>AI Tool</h3><button class="close" onclick="this.closest(\\'.mdl\\').remove()">&times;</button></div><div class="ai-r" style="display:block; min-height:100px;">Thinking...</div></div>';
+            document.body.appendChild(m);
+            let p = '', s = '';
+            if (type === 'Expand') { m.querySelector('h3').innerText = '🪄 Scene Expander'; p = 'Expand: ' + summary; s = 'You are a screenwriter. Write 2-3 rich paragraphs.'; }
+            if (type === 'Concept') { m.querySelector('h3').innerText = '📸 Concept Art'; p = 'Create a Midjourney prompt for: ' + summary; s = 'You are a cinematographer. Output ONLY the prompt.'; }
+            if (type === 'Mood') { m.querySelector('h3').innerText = '🎥 Director Breakdown'; p = 'Lighting, camera, sound for: ' + summary; s = 'You are a film director. Use Markdown.'; }
+            const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p: p, s: s }) });
+            const d = await r.json(); m.querySelector('.ai-r').innerText = d.ok ? d.text : 'Error: ' + d.error;
           }
 
           loadDashboard();
