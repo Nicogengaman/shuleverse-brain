@@ -39,6 +39,10 @@ export default {
           const res = await fetch(SUPA_URL + '/rest/v1/' + body.table + '?' + body.idField + '=eq.' + body.id, { method: 'PATCH', headers: h, body: JSON.stringify({ status: 'RETIRED' }) });
           r = await res.json();
         }
+        else if (p === 'changelog') {
+          const res = await fetch(SUPA_URL + '/rest/v1/change_log?select=*&order=timestamp.desc&limit=50', { headers: h });
+          r = await res.json();
+        }
         else if (p === 'ai') {
           const body = await request.json();
           const MODELS = ['gemini-3.5-flash-lite', 'gemini-3.1-flash-lite', 'gemini-3.8-flash', 'gemini-2.5-flash'];
@@ -81,10 +85,14 @@ export default {
         <style>
           :root { --bg: #0f111a; --pn: #1c1f2b; --cd: #252936; --tx: #f0f2f5; --gd: #f5a623; --mt: #8b92a5; --bl: #3b82f6; --br: #32374a; }
           * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-          body { background: var(--bg); color: var(--tx); height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-          header { height: 60px; background: var(--pn); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--br); flex-shrink: 0; }
+          
+          /* FIXED LAYOUT: Header top, Nav bottom, Content scrolls in between */
+          body { background: var(--bg); color: var(--tx); height: 100dvh; overflow: hidden; }
+          header { position: fixed; top: 0; left: 0; width: 100%; height: 60px; background: var(--pn); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--br); z-index: 100; }
+          main { position: absolute; top: 60px; bottom: 60px; left: 0; width: 100%; overflow-y: auto; padding: 20px; }
+          .nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: var(--pn); border-top: 1px solid var(--br); display: flex; justify-content: space-around; align-items: center; z-index: 100; }
+          
           .menu-btn { background: none; border: none; color: var(--tx); font-size: 24px; cursor: pointer; }
-          main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 90px; }
           .content { display: none; }
           .content.active { display: block; }
           
@@ -97,7 +105,6 @@ export default {
           .title { font-weight: bold; font-size: 16px; }
           .sub { font-size: 12px; color: var(--gd); margin-top: 4px; }
 
-          .nav { height: 60px; background: var(--pn); border-top: 1px solid var(--br); display: flex; justify-content: space-around; align-items: center; flex-shrink: 0; z-index: 10; }
           .tab { color: var(--mt); font-size: 11px; font-weight: bold; cursor: pointer; padding: 10px; text-align: center; width: 25%; }
           .tab.active { color: var(--gd); }
           
@@ -129,7 +136,7 @@ export default {
       </head>
       <body>
         <header>
-          <button class="menu-btn" onclick="alert('Menu works!')">☰</button>
+          <button class="menu-btn" onclick="document.getElementById('menu-modal').style.display='flex'">☰</button>
           <h2>🧠 ShuleVerse</h2>
           <div style="width: 24px;"></div>
         </header>
@@ -161,6 +168,13 @@ export default {
             <button class="btn" style="width:auto; padding:8px 16px; margin-bottom:16px; background:var(--cd); color:var(--tx); border:1px solid var(--br);" onclick="go('stories')">← Back</button>
             <h2 id="ep-title" style="margin-bottom:8px;"></h2>
             <p id="ep-syn" style="color:var(--mt); font-size:13px; margin-bottom:16px;"></p>
+            
+            <!-- EPISODE AI TOOLS -->
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+               <button class="btn" style="width:auto; padding:8px 12px; margin:0; background:var(--gd); color:#000;" onclick="runStoryDoctor()">🩺 Story Doctor</button>
+               <button class="btn" style="width:auto; padding:8px 12px; margin:0;" onclick="runPitchDeck()">📊 Pitch Deck</button>
+            </div>
+
             <h3 style="margin-bottom:12px; color:var(--gd);">Scenes</h3>
             <div id="scene-list"></div>
           </div>
@@ -191,7 +205,16 @@ export default {
           <div class="tab" id="tab-ai" onclick="go('ai')">✨ AI</div>
         </div>
 
-        <!-- MODAL -->
+        <!-- ADMIN MENU MODAL -->
+        <div id="menu-modal" class="mdl">
+          <div class="mdl-c">
+            <div class="mdl-h"><h3>Admin Menu</h3><button class="close" onclick="document.getElementById('menu-modal').style.display='none'">&times;</button></div>
+            <div onclick="viewLogs()" style="padding:16px 0; border-bottom:1px solid var(--br); cursor:pointer; color:white; font-size:16px;">📋 Change Logs</div>
+            <div onclick="alert('Backup coming soon')" style="padding:16px 0; border-bottom:1px solid var(--br); cursor:pointer; color:white; font-size:16px;">💾 Export Backup</div>
+          </div>
+        </div>
+
+        <!-- EDIT MODAL -->
         <div id="modal" class="mdl">
           <div class="mdl-c">
             <div class="mdl-h"><h3 id="m-title">Add</h3><button class="close" onclick="document.getElementById('modal').style.display='none'">&times;</button></div>
@@ -200,10 +223,19 @@ export default {
           </div>
         </div>
 
+        <!-- LOGS MODAL -->
+        <div id="log-modal" class="mdl">
+          <div class="mdl-c">
+            <div class="mdl-h"><h3>Change Logs</h3><button class="close" onclick="document.getElementById('log-modal').style.display='none'">&times;</button></div>
+            <div id="log-list" style="font-size:13px; line-height:1.6;"></div>
+          </div>
+        </div>
+
         <script>
           let currentTab = 'home';
           let currentEntity = 'characters';
           let editingId = null;
+          let currentEpisodeId = null;
 
           const entityConfig = {
             characters: { id: 'character_id', typeField: 'character_type', types: ['STAFF', 'LEARNER', 'COMMUNITY_MEMBER', 'OTHER'] },
@@ -217,9 +249,9 @@ export default {
             document.getElementById('tab-' + page).classList.add('active');
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
             
-            // Handle "episode-detail" special case for tab highlighting
             if (page === 'episode-detail') {
               document.getElementById('tab-stories').classList.add('active');
+              document.getElementById('content-episode-detail').classList.add('active');
             } else {
               document.getElementById('content-' + page).classList.add('active');
             }
@@ -230,6 +262,18 @@ export default {
             if (page === 'universe') loadEntityList(currentEntity);
             if (page === 'stories') loadEpisodes();
             if (page === 'ai') populateAiDropdowns();
+          }
+
+          async function viewLogs() {
+            document.getElementById('menu-modal').style.display = 'none';
+            document.getElementById('log-modal').style.display = 'flex';
+            const list = document.getElementById('log-list'); list.innerText = 'Loading...';
+            try {
+              const r = await fetch('/api/changelog'); const d = await r.json();
+              if (Array.isArray(d) && d.length > 0) {
+                list.innerHTML = d.map(l => '<div style="border-bottom:1px solid var(--br); padding:8px 0;"><b>['+(l.timestamp?l.timestamp.split('T')[1].split('.')[0]:'')+'] '+l.operation+'</b> '+l.entity_type.toUpperCase()+'<br><span style="color:var(--mt)">By: '+l.actor+'</span></div>').join('');
+              } else list.innerText = 'No logs found.';
+            } catch(e) { list.innerText = 'Error loading logs.'; }
           }
 
           async function loadDashboard() {
@@ -303,6 +347,16 @@ export default {
             document.getElementById('m-form').innerHTML = form;
             document.getElementById('m-save').innerText = 'Update';
             
+            // Add Timeline button if it's a character
+            if (type === 'characters') {
+              const timeBtn = document.createElement('button');
+              timeBtn.className = 'btn';
+              timeBtn.style.background = 'var(--bl)';
+              timeBtn.innerText = '📖 View Timeline';
+              timeBtn.onclick = () => showTimeline(id, name);
+              document.getElementById('m-form').appendChild(timeBtn);
+            }
+
             const delBtn = document.createElement('button');
             delBtn.className = 'btn';
             delBtn.style.background = 'rgba(255,94,98,0.2)';
@@ -369,6 +423,7 @@ export default {
           }
 
           async function openEpisode(id, title, synopsis) {
+            currentEpisodeId = id;
             go('episode-detail');
             document.getElementById('content-episode-detail').classList.add('active');
             document.getElementById('ep-title').innerText = title;
@@ -395,6 +450,24 @@ export default {
                 l.innerHTML = html;
               }
             } catch (e) { l.innerHTML = 'Error loading scenes.'; }
+          }
+
+          async function showTimeline(charId, charName) {
+            document.getElementById('modal').style.display = 'none';
+            alert('Loading timeline for ' + charName + '...');
+            try {
+              const pr = await fetch('/api/entities?table=scene_participants&filter=character_id=eq.' + charId);
+              const pd = await pr.json();
+              if (!pd || pd.length === 0) return alert(charName + ' is not in any scenes yet.');
+              
+              const sr = await fetch('/api/entities?table=scenes'); const sd = await sr.json();
+              let tl = '📖 TIMELINE: ' + charName + '\\n\\n';
+              
+              sd.forEach(s => { 
+                if (pd.map(p=>p.scene_id).includes(s.scene_id)) tl += '• Scene ' + s.scene_number + ': ' + (s.title||'') + '\\n'; 
+              });
+              alert(tl);
+            } catch(e) { alert('Error loading timeline.'); }
           }
 
           async function getContext() {
@@ -457,6 +530,28 @@ export default {
             if (type === 'Concept') { m.querySelector('h3').innerText = '📸 Concept Art'; p = 'Create a Midjourney prompt for: ' + summary; s = 'You are a cinematographer. Output ONLY the prompt.'; }
             if (type === 'Mood') { m.querySelector('h3').innerText = '🎥 Director Breakdown'; p = 'Lighting, camera, sound for: ' + summary; s = 'You are a film director. Use Markdown.'; }
             const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p: p, s: s }) });
+            const d = await r.json(); m.querySelector('.ai-r').innerText = d.ok ? d.text : 'Error: ' + d.error;
+          }
+
+          async function runStoryDoctor() {
+            if (!currentEpisodeId) return;
+            const m = document.createElement('div'); m.className = 'mdl'; m.style.display = 'flex';
+            m.innerHTML = '<div class="mdl-c"><div class="mdl-h"><h3>🩺 Story Doctor</h3><button class="close" onclick="this.closest(\\'.mdl\\').remove()">&times;</button></div><div class="ai-r" style="display:block; min-height:100px;">Analyzing pacing...</div></div>';
+            document.body.appendChild(m);
+            const ep = await (await fetch('/api/entities?table=episodes&filter=episode_id=eq.'+currentEpisodeId)).json();
+            const sc = await (await fetch('/api/entities?table=scenes&filter=episode_id=eq.'+currentEpisodeId)).json();
+            const txt = sc.map(s=>'Scene '+s.scene_number+': '+s.summary).join('\\n');
+            const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p: 'Synopsis: '+ep[0].synopsis+'\\nScenes:\\n'+txt, s: 'Analyze pacing, character agency, cliffhanger. Be strict. Use Markdown.' }) });
+            const d = await r.json(); m.querySelector('.ai-r').innerText = d.ok ? d.text : 'Error: ' + d.error;
+          }
+
+          async function runPitchDeck() {
+            if (!currentEpisodeId) return;
+            const m = document.createElement('div'); m.className = 'mdl'; m.style.display = 'flex';
+            m.innerHTML = '<div class="mdl-c"><div class="mdl-h"><h3>📊 Pitch Deck</h3><button class="close" onclick="this.closest(\\'.mdl\\').remove()">&times;</button></div><div class="ai-r" style="display:block; min-height:100px;">Generating pitch...</div></div>';
+            document.body.appendChild(m);
+            const ep = await (await fetch('/api/entities?table=episodes&filter=episode_id=eq.'+currentEpisodeId)).json();
+            const r = await fetch('/api/ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ p: 'Title: '+ep[0].title+'\\nSynopsis: '+ep[0].synopsis, s: 'Create a 1-page producer pitch deck. Include Elevator Pitch, Target Audience, Main Conflict. Use Markdown.' }) });
             const d = await r.json(); m.querySelector('.ai-r').innerText = d.ok ? d.text : 'Error: ' + d.error;
           }
 
