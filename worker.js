@@ -4,11 +4,9 @@ export default {
     const SUPA_URL = (env.SUPABASE_URL || '').trim().replace(/\/$/, '');
     const SUPA_KEY = (env.SUPABASE_SECRET_KEY || '').trim();
 
-    // --- BACKEND API ---
     if (url.pathname.startsWith('/api/')) {
       try {
         const p = url.pathname.replace('/api/', '');
-        // Added Authorization Bearer just in case the new Supabase keys require it
         const h = { 'apikey': SUPA_KEY, 'Authorization': 'Bearer ' + SUPA_KEY, 'Content-Type': 'application/json' };
         let r = {};
         
@@ -41,7 +39,7 @@ export default {
           r = await res.json();
         }
         else if (p === 'changelog') {
-          const res = await fetch(SUPA_URL + '/rest/v1/change_log?select=*&order=timestamp.desc&limit=50', { headers: h });
+          const res = await fetch(SUPA_URL + '/rest/v1/change_log?select=*&order=timestamp.desc&limit=20', { headers: h });
           r = await res.json();
         }
         else if (p === 'ai') {
@@ -75,31 +73,25 @@ export default {
       }
     }
 
-    // --- FRONTEND UI ---
     const html = `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
         <title>ShuleVerse</title>
         <style>
           :root { --bg: #0f111a; --pn: #1c1f2b; --cd: #252936; --tx: #f0f2f5; --gd: #f5a623; --mt: #8b92a5; --bl: #3b82f6; --br: #32374a; }
           * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
           
-          /* PERFECT LAYOUT: Locks header and nav, only main scrolls */
-          html, body { height: 100dvh; overflow: hidden; background: var(--bg); color: var(--tx); }
-          #app { display: flex; flex-direction: column; height: 100%; width: 100%; }
+          /* ABSOLUTE LAYOUT: Locks header and nav. Only main scrolls. */
+          html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg); color: var(--tx); }
           
-          header { flex: 0 0 60px; background: var(--pn); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--br); z-index: 10; }
+          header { position: absolute; top: 0; left: 0; width: 100%; height: 60px; background: var(--pn); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--br); z-index: 10; }
+          main { position: absolute; top: 60px; bottom: 60px; left: 0; width: 100%; overflow-y: auto; padding: 20px; }
+          .nav { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; background: var(--pn); border-top: 1px solid var(--br); display: flex; justify-content: space-around; align-items: center; z-index: 10; }
+          
           .menu-btn { background: none; border: none; color: var(--tx); font-size: 24px; cursor: pointer; }
-          
-          main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 30px; position: relative; }
-          
-          .nav { flex: 0 0 60px; background: var(--pn); border-top: 1px solid var(--br); display: flex; justify-content: space-around; align-items: center; z-index: 10; }
-          .tab { color: var(--mt); font-size: 11px; font-weight: bold; cursor: pointer; padding: 10px; text-align: center; width: 25%; }
-          .tab.active { color: var(--gd); }
-          
           .content { display: none; }
           .content.active { display: block; }
           
@@ -112,14 +104,16 @@ export default {
           .title { font-weight: bold; font-size: 16px; }
           .sub { font-size: 12px; color: var(--gd); margin-top: 4px; }
 
+          .tab { color: var(--mt); font-size: 11px; font-weight: bold; cursor: pointer; padding: 10px; text-align: center; width: 25%; }
+          .tab.active { color: var(--gd); }
+          
           .subnav { display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 8px; }
           .snav-b { background: var(--cd); border: 1px solid var(--br); color: var(--tx); padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; white-space: nowrap; }
           .snav-b.active { background: var(--bl); color: #fff; border-color: var(--bl); }
 
-          .add-btn { position: fixed; bottom: 75px; right: 20px; width: 55px; height: 55px; border-radius: 30px; background: var(--gd); color: #000; font-size: 28px; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(245,166,35,0.4); cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 90; }
+          .add-btn { position: absolute; bottom: 75px; right: 20px; width: 55px; height: 55px; border-radius: 30px; background: var(--gd); color: #000; font-size: 28px; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(245,166,35,0.4); cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 20; }
           
-          /* Modals */
-          .mdl { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 200; display: none; justify-content: center; align-items: flex-end; }
+          .mdl { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 200; display: none; justify-content: center; align-items: flex-end; }
           .mdl-c { background: var(--pn); width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 24px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--br); border-bottom: none; }
           .mdl-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
           .mdl-h h3 { color: var(--gd); font-size: 20px; }
@@ -140,83 +134,83 @@ export default {
         </style>
       </head>
       <body>
-        <div id="app">
-          <header>
-            <button class="menu-btn" onclick="document.getElementById('menu-modal').style.display='flex'">☰</button>
-            <h2>🧠 ShuleVerse</h2>
-            <div style="width: 24px;"></div>
-          </header>
-          
-          <main>
-            <div id="content-home" class="content active">
-              <h3 style="margin-bottom: 16px;">Dashboard</h3>
-              <div class="grid">
-                <div class="card"><div class="val" id="stat-chars">...</div><div class="lbl">Characters</div></div>
-                <div class="card"><div class="val" id="stat-eps">...</div><div class="lbl">Episodes</div></div>
-              </div>
+        <header>
+          <button class="menu-btn" onclick="openMenu()">☰</button>
+          <h2>🧠 ShuleVerse</h2>
+          <div style="width: 24px;"></div>
+        </header>
+        
+        <main>
+          <div id="content-home" class="content active">
+            <h3 style="margin-bottom: 16px;">Dashboard</h3>
+            <div class="grid">
+              <div class="card"><div class="val" id="stat-chars">...</div><div class="lbl">Characters</div></div>
+              <div class="card"><div class="val" id="stat-eps">...</div><div class="lbl">Episodes</div></div>
             </div>
-            
-            <div id="content-universe" class="content">
-              <div class="subnav">
-                <button class="snav-b active" id="btn-characters" onclick="loadEntityList('characters')">Characters</button>
-                <button class="snav-b" id="btn-locations" onclick="loadEntityList('locations')">Locations</button>
-                <button class="snav-b" id="btn-props" onclick="loadEntityList('props')">Props</button>
-              </div>
-              <div id="list-universe">Loading...</div>
-            </div>
-            
-            <div id="content-stories" class="content">
-              <h3 style="margin-bottom: 16px;">Episodes</h3>
-              <div id="list-episodes">Loading...</div>
-            </div>
-  
-            <div id="content-episode-detail" class="content">
-              <button class="btn" style="width:auto; padding:8px 16px; margin-bottom:16px; background:var(--cd); color:var(--tx); border:1px solid var(--br);" onclick="go('stories')">← Back</button>
-              <h2 id="ep-title" style="margin-bottom:8px;"></h2>
-              <p id="ep-syn" style="color:var(--mt); font-size:13px; margin-bottom:16px;"></p>
-              
-              <div style="display:flex; gap:8px; margin-bottom:16px;">
-                 <button class="btn" style="width:auto; padding:8px 12px; margin:0; background:var(--gd); color:#000;" onclick="runStoryDoctor()">🩺 Story Doctor</button>
-                 <button class="btn" style="width:auto; padding:8px 12px; margin:0;" onclick="runPitchDeck()">📊 Pitch Deck</button>
-              </div>
-  
-              <h3 style="margin-bottom:12px; color:var(--gd);">Scenes</h3>
-              <div id="scene-list"></div>
-            </div>
-            
-            <div id="content-ai" class="content">
-              <h3 style="margin-bottom: 16px; color: var(--gd);">AI Studio</h3>
-              <div class="ai-c">
-                <div class="ai-t">💡 Generate Episode Idea</div>
-                <textarea id="ai-prompt" style="width:100%;height:70px;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br)"></textarea>
-                <button class="btn" onclick="genCtxIdea()">Generate</button>
-                <div id="ai-res" class="ai-r"></div>
-              </div>
-              <div class="ai-c">
-                <div class="ai-t">🎬 Auto-Scenes Generator</div>
-                <select id="ai-ep-select" style="width:100%;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br);margin-bottom:10px;"></select>
-                <button class="btn" onclick="genAutoScenes()">Generate 4 Scenes</button>
-                <div id="ai-scene-res" class="ai-r"></div>
-              </div>
-            </div>
-          </main>
-
-          <div class="nav">
-            <div class="tab active" id="tab-home" onclick="go('home')">🏠 Home</div>
-            <div class="tab" id="tab-universe" onclick="go('universe')">🌍 Universe</div>
-            <div class="tab" id="tab-stories" onclick="go('stories')">📖 Stories</div>
-            <div class="tab" id="tab-ai" onclick="go('ai')">✨ AI</div>
           </div>
-        </div>
+          
+          <div id="content-universe" class="content">
+            <div class="subnav">
+              <button class="snav-b active" id="btn-characters" onclick="loadEntityList('characters')">Characters</button>
+              <button class="snav-b" id="btn-locations" onclick="loadEntityList('locations')">Locations</button>
+              <button class="snav-b" id="btn-props" onclick="loadEntityList('props')">Props</button>
+            </div>
+            <div id="list-universe">Loading...</div>
+          </div>
+          
+          <div id="content-stories" class="content">
+            <h3 style="margin-bottom: 16px;">Episodes</h3>
+            <div id="list-episodes">Loading...</div>
+          </div>
+
+          <div id="content-episode-detail" class="content">
+            <button class="btn" style="width:auto; padding:8px 16px; margin-bottom:16px; background:var(--cd); color:var(--tx); border:1px solid var(--br);" onclick="go('stories')">← Back</button>
+            <h2 id="ep-title" style="margin-bottom:8px;"></h2>
+            <p id="ep-syn" style="color:var(--mt); font-size:13px; margin-bottom:16px;"></p>
+            
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+               <button class="btn" style="width:auto; padding:8px 12px; margin:0; background:var(--gd); color:#000;" onclick="runStoryDoctor()">🩺 Story Doctor</button>
+               <button class="btn" style="width:auto; padding:8px 12px; margin:0;" onclick="runPitchDeck()">📊 Pitch Deck</button>
+            </div>
+
+            <h3 style="margin-bottom:12px; color:var(--gd);">Scenes</h3>
+            <div id="scene-list"></div>
+          </div>
+          
+          <div id="content-ai" class="content">
+            <h3 style="margin-bottom: 16px; color: var(--gd);">AI Studio</h3>
+            <div class="ai-c">
+              <div class="ai-t">💡 Generate Episode Idea</div>
+              <textarea id="ai-prompt" style="width:100%;height:70px;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br)"></textarea>
+              <button class="btn" onclick="genCtxIdea()">Generate</button>
+              <div id="ai-res" class="ai-r"></div>
+            </div>
+            <div class="ai-c">
+              <div class="ai-t">🎬 Auto-Scenes Generator</div>
+              <select id="ai-ep-select" style="width:100%;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br);margin-bottom:10px;"></select>
+              <button class="btn" onclick="genAutoScenes()">Generate 4 Scenes</button>
+              <div id="ai-scene-res" class="ai-r"></div>
+            </div>
+          </div>
+        </main>
 
         <button class="add-btn" id="add-btn" onclick="openAddModal()">+</button>
 
-        <!-- MODALS -->
+        <div class="nav">
+          <div class="tab active" id="tab-home" onclick="go('home')">🏠 Home</div>
+          <div class="tab" id="tab-universe" onclick="go('universe')">🌍 Universe</div>
+          <div class="tab" id="tab-stories" onclick="go('stories')">📖 Stories</div>
+          <div class="tab" id="tab-ai" onclick="go('ai')">✨ AI</div>
+        </div>
+
+        <!-- ADMIN MENU MODAL -->
         <div id="menu-modal" class="mdl">
           <div class="mdl-c">
             <div class="mdl-h"><h3>Admin Menu</h3><button class="close" onclick="document.getElementById('menu-modal').style.display='none'">&times;</button></div>
-            <div onclick="viewLogs()" style="padding:16px 0; border-bottom:1px solid var(--br); cursor:pointer; color:white; font-size:16px;">📋 Change Logs</div>
-            <div onclick="alert('Backup coming soon')" style="padding:16px 0; border-bottom:1px solid var(--br); cursor:pointer; color:white; font-size:16px;">💾 Export Backup</div>
+            <div style="margin-bottom:16px;">
+              <button class="btn" onclick="loadLogs()">📋 View Change Logs</button>
+            </div>
+            <div id="log-list" style="font-size:13px; line-height:1.6; background:var(--bg); padding:10px; border-radius:8px;"></div>
           </div>
         </div>
 
@@ -228,15 +222,7 @@ export default {
           </div>
         </div>
 
-        <div id="log-modal" class="mdl">
-          <div class="mdl-c">
-            <div class="mdl-h"><h3>Change Logs</h3><button class="close" onclick="document.getElementById('log-modal').style.display='none'">&times;</button></div>
-            <div id="log-list" style="font-size:13px; line-height:1.6;"></div>
-          </div>
-        </div>
-
         <script>
-          // GLOBAL ERROR CATCHER
           window.onerror = function(msg, url, line) {
             alert('🚨 APP ERROR: ' + msg + ' at line ' + line);
             return false;
@@ -252,6 +238,36 @@ export default {
             locations: { id: 'location_id', typeField: 'location_type', types: ['SCHOOL_AREA', 'CLASSROOM', 'OFFICE', 'STAFF_AREA', 'PLAYGROUND', 'HOME', 'COMMUNITY_LOCATION', 'ROAD'] },
             props: { id: 'prop_id', typeField: 'prop_type', types: ['CONTAINER', 'PERSONAL_ITEM', 'SCHOOL_MATERIAL', 'ADMINISTRATIVE_MATERIAL', 'TIMEKEEPING_DEVICE', 'TEACHING_MATERIAL', 'SCHOOL_EQUIPMENT', 'FURNITURE', 'ELECTRONIC_DEVICE'] }
           };
+
+          function openMenu() {
+            document.getElementById('menu-modal').style.display = 'flex';
+            document.getElementById('log-list').innerHTML = '<span style="color:var(--mt)">Tap "View Change Logs" to load.</span>';
+          }
+
+          async function loadLogs() {
+            const list = document.getElementById('log-list'); 
+            list.innerText = 'Loading...';
+            
+            try {
+              const r = await fetch('/api/changelog'); 
+              const d = await r.json();
+              
+              // If it's an error object or not an array, show us what it is!
+              if (!Array.isArray(d)) {
+                list.innerHTML = '<span style="color:red;">DB Error: ' + JSON.stringify(d) + '</span>';
+                return;
+              }
+              
+              if (d.length === 0) {
+                list.innerText = 'No logs found yet. Try adding a character to see one.';
+                return;
+              }
+
+              list.innerHTML = d.map(l => '<div style="border-bottom:1px solid var(--br); padding:8px 0;"><b>['+(l.timestamp?l.timestamp.split('T')[1].split('.')[0]:'')+'] '+l.operation+'</b> '+l.entity_type.toUpperCase()+'<br><span style="color:var(--mt)">By: '+l.actor+'</span></div>').join('');
+            } catch(e) { 
+              list.innerHTML = '<span style="color:red;">Network Error: ' + e.message + '</span>'; 
+            }
+          }
 
           function go(page) {
             currentTab = page;
@@ -272,33 +288,6 @@ export default {
             if (page === 'universe') loadEntityList(currentEntity);
             if (page === 'stories') loadEpisodes();
             if (page === 'ai') populateAiDropdowns();
-          }
-
-          async function viewLogs() {
-            document.getElementById('menu-modal').style.display = 'none';
-            document.getElementById('log-modal').style.display = 'flex';
-            const list = document.getElementById('log-list'); 
-            list.innerText = 'Loading...';
-            
-            try {
-              const r = await fetch('/api/changelog'); 
-              const d = await r.json();
-              
-              // If it's an error object or not an array, show us what it is!
-              if (!Array.isArray(d)) {
-                list.innerText = 'Data Error: ' + JSON.stringify(d);
-                return;
-              }
-              
-              if (d.length === 0) {
-                list.innerText = 'No logs found yet. Try adding a character.';
-                return;
-              }
-
-              list.innerHTML = d.map(l => '<div style="border-bottom:1px solid var(--br); padding:8px 0;"><b>['+(l.timestamp?l.timestamp.split('T')[1].split('.')[0]:'')+'] '+l.operation+'</b> '+l.entity_type.toUpperCase()+'<br><span style="color:var(--mt)">By: '+l.actor+'</span></div>').join('');
-            } catch(e) { 
-              list.innerText = 'Network Error: ' + e.message; 
-            }
           }
 
           async function loadDashboard() {
