@@ -86,12 +86,11 @@ export default {
           :root { --bg: #0f111a; --pn: #1c1f2b; --cd: #252936; --tx: #f0f2f5; --gd: #f5a623; --mt: #8b92a5; --bl: #3b82f6; --br: #32374a; }
           * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
           
-          /* PERFECT MOBILE LAYOUT: Flexbox locks header and nav, only main scrolls */
-          html, body { height: 100dvh; height: 100vh; overflow: hidden; background: var(--bg); color: var(--tx); }
-          #app { display: flex; flex-direction: column; height: 100%; }
-          header { flex: 0 0 60px; background: var(--pn); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--br); z-index: 10; }
-          main { flex: 1; overflow-y: auto; padding: 20px; padding-bottom: 90px; position: relative; }
-          .nav { flex: 0 0 60px; background: var(--pn); border-top: 1px solid var(--br); display: flex; justify-content: space-around; align-items: center; z-index: 10; }
+          /* ABSOLUTE FIXED LAYOUT */
+          body { background: var(--bg); color: var(--tx); overflow: hidden; margin: 0; padding: 0; }
+          header { position: fixed; top: 0; left: 0; width: 100%; height: 60px; background: var(--pn); display: flex; justify-content: space-between; align-items: center; padding: 0 20px; border-bottom: 1px solid var(--br); z-index: 100; }
+          main { position: absolute; top: 60px; bottom: 60px; left: 0; width: 100%; overflow-y: auto; padding: 20px; }
+          .nav { position: fixed; bottom: 0; left: 0; width: 100%; height: 60px; background: var(--pn); border-top: 1px solid var(--br); display: flex; justify-content: space-around; align-items: center; z-index: 100; }
           
           .menu-btn { background: none; border: none; color: var(--tx); font-size: 24px; cursor: pointer; }
           .content { display: none; }
@@ -116,7 +115,7 @@ export default {
           .add-btn { position: fixed; bottom: 75px; right: 20px; width: 55px; height: 55px; border-radius: 30px; background: var(--gd); color: #000; font-size: 28px; font-weight: bold; border: none; box-shadow: 0 4px 15px rgba(245,166,35,0.4); cursor: pointer; display: none; align-items: center; justify-content: center; z-index: 90; }
           
           .mdl { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 200; display: none; justify-content: center; align-items: flex-end; }
-          .mdl-c { background: var(--pn); width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 24px; max-height: 90vh; overflow-y: auto; border: 1px solid var(--br); border-bottom: none; }
+          .mdl-c { background: var(--pn); width: 100%; max-width: 600px; border-radius: 20px 20px 0 0; padding: 24px; max-height: 85vh; overflow-y: auto; border: 1px solid var(--br); border-bottom: none; }
           .mdl-h { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
           .mdl-h h3 { color: var(--gd); font-size: 20px; }
           .close { background: none; border: none; color: var(--mt); font-size: 28px; cursor: pointer; }
@@ -136,76 +135,74 @@ export default {
         </style>
       </head>
       <body>
-        <div id="app">
-          <header>
-            <button class="menu-btn" onclick="document.getElementById('menu-modal').style.display='flex'">☰</button>
-            <h2>🧠 ShuleVerse</h2>
-            <div style="width: 24px;"></div>
-          </header>
-          
-          <main>
-            <div id="content-home" class="content active">
-              <h3 style="margin-bottom: 16px;">Dashboard</h3>
-              <div class="grid">
-                <div class="card"><div class="val" id="stat-chars">...</div><div class="lbl">Characters</div></div>
-                <div class="card"><div class="val" id="stat-eps">...</div><div class="lbl">Episodes</div></div>
-              </div>
+        <header>
+          <button class="menu-btn" onclick="document.getElementById('menu-modal').style.display='flex'">☰</button>
+          <h2>🧠 ShuleVerse</h2>
+          <div style="width: 24px;"></div>
+        </header>
+        
+        <main>
+          <div id="content-home" class="content active">
+            <h3 style="margin-bottom: 16px;">Dashboard</h3>
+            <div class="grid">
+              <div class="card"><div class="val" id="stat-chars">...</div><div class="lbl">Characters</div></div>
+              <div class="card"><div class="val" id="stat-eps">...</div><div class="lbl">Episodes</div></div>
             </div>
-            
-            <div id="content-universe" class="content">
-              <div class="subnav">
-                <button class="snav-b active" id="btn-characters" onclick="loadEntityList('characters')">Characters</button>
-                <button class="snav-b" id="btn-locations" onclick="loadEntityList('locations')">Locations</button>
-                <button class="snav-b" id="btn-props" onclick="loadEntityList('props')">Props</button>
-              </div>
-              <div id="list-universe">Loading...</div>
-            </div>
-            
-            <div id="content-stories" class="content">
-              <h3 style="margin-bottom: 16px;">Episodes</h3>
-              <div id="list-episodes">Loading...</div>
-            </div>
-  
-            <div id="content-episode-detail" class="content">
-              <button class="btn" style="width:auto; padding:8px 16px; margin-bottom:16px; background:var(--cd); color:var(--tx); border:1px solid var(--br);" onclick="go('stories')">← Back</button>
-              <h2 id="ep-title" style="margin-bottom:8px;"></h2>
-              <p id="ep-syn" style="color:var(--mt); font-size:13px; margin-bottom:16px;"></p>
-              
-              <div style="display:flex; gap:8px; margin-bottom:16px;">
-                 <button class="btn" style="width:auto; padding:8px 12px; margin:0; background:var(--gd); color:#000;" onclick="runStoryDoctor()">🩺 Story Doctor</button>
-                 <button class="btn" style="width:auto; padding:8px 12px; margin:0;" onclick="runPitchDeck()">📊 Pitch Deck</button>
-              </div>
-  
-              <h3 style="margin-bottom:12px; color:var(--gd);">Scenes</h3>
-              <div id="scene-list"></div>
-            </div>
-            
-            <div id="content-ai" class="content">
-              <h3 style="margin-bottom: 16px; color: var(--gd);">AI Studio</h3>
-              <div class="ai-c">
-                <div class="ai-t">💡 Generate Episode Idea</div>
-                <textarea id="ai-prompt" style="width:100%;height:70px;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br)"></textarea>
-                <button class="btn" onclick="genCtxIdea()">Generate</button>
-                <div id="ai-res" class="ai-r"></div>
-              </div>
-              <div class="ai-c">
-                <div class="ai-t">🎬 Auto-Scenes Generator</div>
-                <select id="ai-ep-select" style="width:100%;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br);margin-bottom:10px;"></select>
-                <button class="btn" onclick="genAutoScenes()">Generate 4 Scenes</button>
-                <div id="ai-scene-res" class="ai-r"></div>
-              </div>
-            </div>
-          </main>
-
-          <div class="nav">
-            <div class="tab active" id="tab-home" onclick="go('home')">🏠 Home</div>
-            <div class="tab" id="tab-universe" onclick="go('universe')">🌍 Universe</div>
-            <div class="tab" id="tab-stories" onclick="go('stories')">📖 Stories</div>
-            <div class="tab" id="tab-ai" onclick="go('ai')">✨ AI</div>
           </div>
-        </div>
+          
+          <div id="content-universe" class="content">
+            <div class="subnav">
+              <button class="snav-b active" id="btn-characters" onclick="loadEntityList('characters')">Characters</button>
+              <button class="snav-b" id="btn-locations" onclick="loadEntityList('locations')">Locations</button>
+              <button class="snav-b" id="btn-props" onclick="loadEntityList('props')">Props</button>
+            </div>
+            <div id="list-universe">Loading...</div>
+          </div>
+          
+          <div id="content-stories" class="content">
+            <h3 style="margin-bottom: 16px;">Episodes</h3>
+            <div id="list-episodes">Loading...</div>
+          </div>
+
+          <div id="content-episode-detail" class="content">
+            <button class="btn" style="width:auto; padding:8px 16px; margin-bottom:16px; background:var(--cd); color:var(--tx); border:1px solid var(--br);" onclick="go('stories')">← Back</button>
+            <h2 id="ep-title" style="margin-bottom:8px;"></h2>
+            <p id="ep-syn" style="color:var(--mt); font-size:13px; margin-bottom:16px;"></p>
+            
+            <div style="display:flex; gap:8px; margin-bottom:16px;">
+               <button class="btn" style="width:auto; padding:8px 12px; margin:0; background:var(--gd); color:#000;" onclick="runStoryDoctor()">🩺 Story Doctor</button>
+               <button class="btn" style="width:auto; padding:8px 12px; margin:0;" onclick="runPitchDeck()">📊 Pitch Deck</button>
+            </div>
+
+            <h3 style="margin-bottom:12px; color:var(--gd);">Scenes</h3>
+            <div id="scene-list"></div>
+          </div>
+          
+          <div id="content-ai" class="content">
+            <h3 style="margin-bottom: 16px; color: var(--gd);">AI Studio</h3>
+            <div class="ai-c">
+              <div class="ai-t">💡 Generate Episode Idea</div>
+              <textarea id="ai-prompt" style="width:100%;height:70px;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br)"></textarea>
+              <button class="btn" onclick="genCtxIdea()">Generate</button>
+              <div id="ai-res" class="ai-r"></div>
+            </div>
+            <div class="ai-c">
+              <div class="ai-t">🎬 Auto-Scenes Generator</div>
+              <select id="ai-ep-select" style="width:100%;padding:10px;border-radius:8px;background:var(--bg);color:white;border:1px solid var(--br);margin-bottom:10px;"></select>
+              <button class="btn" onclick="genAutoScenes()">Generate 4 Scenes</button>
+              <div id="ai-scene-res" class="ai-r"></div>
+            </div>
+          </div>
+        </main>
 
         <button class="add-btn" id="add-btn" onclick="openAddModal()">+</button>
+
+        <div class="nav">
+          <div class="tab active" id="tab-home" onclick="go('home')">🏠 Home</div>
+          <div class="tab" id="tab-universe" onclick="go('universe')">🌍 Universe</div>
+          <div class="tab" id="tab-stories" onclick="go('stories')">📖 Stories</div>
+          <div class="tab" id="tab-ai" onclick="go('ai')">✨ AI</div>
+        </div>
 
         <!-- MODALS -->
         <div id="menu-modal" class="mdl">
@@ -246,14 +243,16 @@ export default {
           function go(page) {
             currentTab = page;
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.getElementById('tab-' + page).classList.add('active');
             document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
             
             if (page === 'episode-detail') {
               document.getElementById('tab-stories').classList.add('active');
               document.getElementById('content-episode-detail').classList.add('active');
             } else {
-              document.getElementById('content-' + page).classList.add('active');
+              const tabEl = document.getElementById('tab-' + page);
+              if(tabEl) tabEl.classList.add('active');
+              const contentEl = document.getElementById('content-' + page);
+              if(contentEl) contentEl.classList.add('active');
             }
             
             document.getElementById('add-btn').style.display = (page === 'universe' || page === 'stories') ? 'flex' : 'none';
