@@ -134,3 +134,31 @@ export default {
     return new Response(html, { headers: { 'Content-Type': 'text/html' } });
   }
 };
+// ==========================================
+// FEATURE: ICON VOCABULARY (APPEND ONLY)
+// ==========================================
+App.views.icons = `
+  <h2 style="margin-bottom: 16px;">App Icon Vocabulary</h2>
+  <p style="font-size: 13px; color: var(--mt); margin-bottom: 16px;">Here is every icon we will use to build the app.</p>
+  
+  <div class="icon-grid">
+    <div class="icon-box"><span>👤</span> <span>Character</span></div>
+    <div class="icon-box"><span>📍</span> <span>Location</span></div>
+    <div class="icon-box"><span>📦</span> <span>Prop</span></div>
+    <div class="icon-box"><span>🔗</span> <span>Relationship</span></div>
+    <div class="icon-box"><span>📖</span> <span>Episode / Story</span></div>
+    <div class="icon-box"><span>🎬</span> <span>Scene</span></div>
+    <div class="icon-box"><span>📄</span> <span>Script / Doc</span></div>
+    <div class="icon-box"><span>📋</span> <span>Continuity Fact</span></div>
+    <div class="icon-box"><span>⚡</span> <span>Story Event</span></div>
+    <div class="icon-box"><span>✨</span> <span>AI Generation</span></div>
+    <div class="icon-box"><span>🩺</span> <span>Story Doctor</span></div>
+    <div class="icon-box"><span>📊</span> <span>Pitch Deck</span></div>
+    <div class="icon-box"><span>🪄</span> <span>Scene Expander</span></div>
+    <div class="icon-box"><span>📸</span> <span>Concept Art</span></div>
+    <div class="icon-box"><span>🎥</span> <span>Mood Board</span></div>
+    <div class="icon-box"><span>✏️</span> <span>Edit</span></div>
+    <div class="icon-box"><span>🗑️</span> <span>Retire / Delete</span></div>
+    <div class="icon-box"><span>🔄</span> <span>Refresh</span></div>
+  </div>
+`;
