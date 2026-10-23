@@ -163,4 +163,3 @@ App.views.icons = `
     <div class="icon-box"><span>🗑️</span> <span>Retire / Delete</span></div>
     <div class="icon-box"><span>🔄</span> <span>Refresh</span></div>
   </div>
-`;
